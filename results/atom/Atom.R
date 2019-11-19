@@ -6,29 +6,13 @@ library(sentimentr)
 library(syuzhet)
 library(tidytext)
 library(textdata)
-library(dplyr)
+library(stringr)
 
-#install.packages(c("textclean","stringi","qdapRegex"...))
+atom <- read.csv("~/Downloads/19Fall/FinTech/NeoBanks/data/atom.csv", header = TRUE, stringsAsFactors = F)
 
+atom$id <- c(1:nrow(atom))
 
-# ============================================================================================================================
-#-----------------------------------------  STEP 1: READING DATA AND PREROCESSING --------------------------------------------
-# ============================================================================================================================
-monzo <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/monzo.csv", header = TRUE, stringsAsFactors = F)
-
-#Creating an "id" variable
-monzo$id <- c(1:nrow(monzo))
-
-#Cleaning for html tags, emoticons, emoji, extraneous white space, punctuation, numbers
-monzo$content <- qdapRegex::rm_emoticon(monzo$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
-
-
-
-# ============================================================================================================================
-#-----------------------------------------  STEP 2: CREATING LIST OF ASPECTS -------------------------------------------------
-# ============================================================================================================================
-
-#For now, we are looking at ten aspects, namely account, ui, fees, app, customer service, fast, card, safety, other, bank_overall
+atom$content <- qdapRegex::rm_emoticon(atom$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
 
 account.asp <- c("account","spend","current","debit","money","credit","overdraft","withdrawal","business","pot","finance","invest","saving","limit","wallet","interest","budget","cheque")
 ui.asp <- c("login","payments","person","efficient","inefficient","easy","problem","difficult","transparent","ui","user","interface","experience")
@@ -38,21 +22,11 @@ fast.asp <- c("quick","instant","fast","time")
 card.asp <- c("card","mastercard","limit")
 safety.asp <- c("biometric","recog","face","voice","safe","fraud","verification","verify")
 other.asp <- c("alternative","transparent")
-bank_overall.asp <- c("bank","monzo")
+bank_overall.asp <- c("bank","atom")
 app.asp <- c("app","function","notification","notify","issue")
 
-
-
-# ============================================================================================================================
-#-----------------------------------  STEP 3: SUBSETTING THE ORIGINAL DATA BY ASPECT ----------------------------------------
-# ============================================================================================================================
-
-#Given a dataframe (Eg: "monzo" from Step 1) and a vector of aspect (Eg: "account.asp" or "ui.asp"), this function returns a subset of the original dataframe
-# where the users have mentioned that particular aspect in their reviews
 get_aspect_df <- function(bank,aspect_syn){
-  #Filtering the dataframe for the cases only when the aspect exists
   bank <- bank[grepl(paste(aspect_syn,collapse = "|"),bank$content),]
-  #From the reviews, extracting only the sentences where people have talked about the given feature/aspect
   for(i in c(1:nrow(bank))){
     print(i)
     cur_rev <- str_split(bank$content[i],pattern = "\\.")%>%unlist()
@@ -63,24 +37,12 @@ get_aspect_df <- function(bank,aspect_syn){
   return(bank)
 }
 
+acct <- get_aspect_df(atom,account.asp)
+ui <- get_aspect_df(atom,ui.asp)
+fees <- get_aspect_df(atom,fees.asp)
+cust_service <- get_aspect_df(atom,customer_service.asp)
+card <- get_aspect_df(atom,card.asp)
 
-#Getting data by aspect
-acct <- get_aspect_df(monzo,account.asp)
-ui <- get_aspect_df(monzo,ui.asp)
-fees <- get_aspect_df(monzo,fees.asp)
-cust_service <- get_aspect_df(monzo,customer_service.asp)
-card <- get_aspect_df(monzo,card.asp)
-#and so on
-
-
-
-
-
-# ============================================================================================================================
-#-----------------------------------  STEP 4: SENTIMENT ANALYSIS BY ASPECT ---------------------------------------------------
-# ============================================================================================================================
-
-#Given a aspect dataframe (Eg: "acct" or "ui" from Step 3, this function returns a overall sentiment score (between -5 and 5) for each review)
 get_sentiment <- function(df){
   sent <- syuzhet::get_sentiment(df$content)
   range <- max(sent)-min(sent)
@@ -88,235 +50,17 @@ get_sentiment <- function(df){
   return(sentiment)
 }
 
-#Adding the sentiment column to each aspect dataframe
 acct$sentiment <- get_sentiment(acct)
 ui$sentiment <- get_sentiment(ui)
 fees$sentiment <- get_sentiment(fees)
 cust_service$sentiment <- get_sentiment(cust_service)
 card$sentiment <- get_sentiment(card)
 
-
-
-
-
-# ============================================================================================================================
-#---------------------  STEP 5: FINDING POSITIVE AND NEGATIVE ADJECTIVES TO DESCRIBE AN ASPECT---------------------------------
-# ============================================================================================================================
-
-#For this part, we'll be using a library called "udpipe". It helps us parse sentences as a human would do. 
-
-#To begin you need to download the udpipe model for english language 
-model    <- udpipe_download_model(language = "english-ewt")
-if(!model$download_failed){
-  ud_eng <- udpipe_load_model(model)}
-
-
-#Next, creating a udpipe object (might take a couple of minutes to run).
-#Also, calling the object as acct.ud to indicate that it is made out of the account dataframe and is a udpipe object
-acct.ud <- udpipe::udpipe(acct$content,ud_eng, doc_id = acct$id)%>%as.data.frame()
-ui.ud <- udpipe::udpipe(ui$content,ud_eng, doc_id = ui$id)%>%as.data.frame()
-fees.ud <- udpipe::udpipe(fees$content,ud_eng, doc_id = fees$id)%>%as.data.frame() 
-card.ud <- udpipe::udpipe(card$content,ud_eng, doc_id = card$id)%>%as.data.frame()
-
-
-#Given a udpipe object, this function returns top 5 positive and negative keywords people used to describe that feature
-get_keywords <- function(udpipe.obj){
-  stats <- keywords_rake(x = udpipe.obj, term = "token", group = "doc_id", ngram_max = 4,relevant = udpipe.obj$upos %in% c("NOUN", "ADJ"))%>%data.frame()
-  j <- stats[stats$ngram==3,]
-  j$sentiment <- syuzhet::get_sentiment(j$keyword)
-  j.pos <- j[j$sentiment>0,]%>%arrange(.,desc(sentiment))
-  j.neg <- j[j$sentiment<0,]%>%dplyr::arrange(.,sentiment)
-  
-  pos <- j.pos$keyword
-  neg <- j.neg$keyword
-  if(length(pos)<5){pos <- c(pos,rep(NA,(5-length(pos))))}
-  else{pos <- pos[1:5]}
-  if(length(neg)<5){neg <- c(neg,rep(NA,(5-length(neg))))}
-  else{neg<-neg[1:5]}
-  
-  df <- data.frame(pos_words=pos,neg_words=neg)
-  return(df)
-}
-  
-
-#Finding positive and negative keywords
-acct.keywords <- get_keywords(acct.ud)
-ui.keywords <- get_keywords(ui.ud)
-fees.keywords <- get_keywords(fees.ud)
-card.keywords <- get_keywords(card.ud)
-
-
-
-
-
-
-
-# EXPORTING CSV
-write.csv(acct,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/monese/acct.csv", row.names=F)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 
-# library(readtext)
-# library(tm)
-# library(quanteda)
-# library(topicmodels)
-# library(textrank)
-# library(lubridate)
-# library(xts)
-# library(wordcloud)
-# library(wordcloud2)
-# library(textnets)
-# library(igraph)
-# library(ggraph)
-# library(ggplot2)
-# library(tidyr)
-# library(qgraph)
-# library(webshot)
-# library(htmlwidgets)
-# library(DataExplorer)
-# 
-# 
-# 
-# 
-# acc <- rep(0,nrow(monzo))
-# loan <- rep(0,nrow(monzo))
-# u_i <- rep(0,nrow(monzo))
-# fee <- rep(0,nrow(monzo))
-# cust_serv <- rep(0,nrow(monzo))
-# agile <- rep(0,nrow(monzo))
-# cards <- rep(0,nrow(monzo))
-# safe <- rep(0,nrow(monzo))
-# others <- rep(0,nrow(monzo))
-# overall <- rep(0,nrow(monzo))
-# application <- rep(0,nrow(monzo))
-# 
-# for(i in c(1:nrow(monzo))){
-#   print(i)
-#   cur_review <- monzo$content[i]
-#   if(grepl(paste(account,collapse = "|"),cur_review)){acc[i]<-1}
-#   if(grepl(paste(ui,collapse = "|"),cur_review)){u_i[i]<-1}
-#   if(grepl(paste(fees,collapse = "|"),cur_review)){fee[i]<-1}
-#   if(grepl(paste(customer_service,collapse = "|"),cur_review)){cust_serv[i]<-1}
-#   if(grepl(paste(fast,collapse = "|"),cur_review)){agile[i]<-1}
-#   if(grepl(paste(card,collapse = "|"),cur_review)){cards[i]<-1}
-#   if(grepl(paste(safety,collapse = "|"),cur_review)){safe[i]<-1}
-#   if(grepl(paste(other,collapse = "|"),cur_review)){others[i]<-1}
-#   if(grepl(paste(bank_overall,collapse = "|"),cur_review)){overall[i]<-1}
-#   if(grepl(paste(app,collapse = "|"),cur_review)){application[i]<-1}
-# }
-# 
-# aspects <- data.frame(account=acc,ui=u_i,fees=fee,customer_service=cust_serv,fast=agile,card=cards,safety=safe,other=others,bank_overall=overall,app=application)
-# monzo <- cbind(monzo,aspects)
-# 
-# 
-# #Grouping by aspects
+mean(acct$sentiment)
+mean(ui$sentiment)
+
+write.csv(acct, )
+#Grouping by aspects
 # #Return a dataframe of aspect
 # 
 # get_aspect_df <- function(bank,aspect,aspect_syn){
@@ -968,6 +712,4 @@ write.csv(acct,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/monese/
 # 
 # 
 # myDict <0- dictionary(list(feature = c("mobile*","phone*","")))
-# 
-# 
 # 
