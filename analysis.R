@@ -6,6 +6,7 @@ library(sentimentr)
 library(syuzhet)
 library(tidytext)
 library(textdata)
+library(dplyr)
 
 #install.packages(c("textclean","stringi","qdapRegex"...))
 
@@ -20,8 +21,6 @@ monzo$id <- c(1:nrow(monzo))
 
 #Cleaning for html tags, emoticons, emoji, extraneous white space, punctuation, numbers
 monzo$content <- qdapRegex::rm_emoticon(monzo$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
-
-
 
 
 
@@ -152,7 +151,8 @@ card.keywords <- get_keywords(card.ud)
 
 
 
-
+# EXPORTING CSV
+write.csv(acct,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/monese/acct.csv", row.names=F)
 
 
 
