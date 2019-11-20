@@ -7,6 +7,7 @@ library(syuzhet)
 library(tidytext)
 library(textdata)
 library(dplyr)
+library(stringr)
 
 #install.packages(c("textclean","stringi","qdapRegex"...))
 
@@ -106,9 +107,9 @@ card$sentiment <- get_sentiment(card)
 #For this part, we'll be using a library called "udpipe". It helps us parse sentences as a human would do. 
 
 #To begin you need to download the udpipe model for english language 
-model    <- udpipe_download_model(language = "english-ewt")
-if(!model$download_failed){
-  ud_eng <- udpipe_load_model(model)}
+  model    <- udpipe_download_model(language = "english-ewt")
+  if(!model$download_failed){
+    ud_eng <- udpipe_load_model(model)}
 
 
 #Next, creating a udpipe object (might take a couple of minutes to run).

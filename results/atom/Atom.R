@@ -6,13 +6,27 @@ library(sentimentr)
 library(syuzhet)
 library(tidytext)
 library(textdata)
+library(dplyr)
 library(stringr)
 
+# ============================================================================================================================
+#-----------------------------------------  STEP 1: READING DATA AND PREROCESSING --------------------------------------------
+# ============================================================================================================================
 atom <- read.csv("~/Downloads/19Fall/FinTech/NeoBanks/data/atom.csv", header = TRUE, stringsAsFactors = F)
 
+#Creating an "id" variable
 atom$id <- c(1:nrow(atom))
 
+#Cleaning for html tags, emoticons, emoji, extraneous white space, punctuation, numbers
 atom$content <- qdapRegex::rm_emoticon(atom$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
+
+
+
+# ============================================================================================================================
+#-----------------------------------------  STEP 2: CREATING LIST OF ASPECTS -------------------------------------------------
+# ============================================================================================================================
+
+#For now, we are looking at ten aspects, namely account, ui, fees, app, customer service, fast, card, safety, other, bank_overall
 
 account.asp <- c("account","spend","current","debit","money","credit","overdraft","withdrawal","business","pot","finance","invest","saving","limit","wallet","interest","budget","cheque")
 ui.asp <- c("login","payments","person","efficient","inefficient","easy","problem","difficult","transparent","ui","user","interface","experience")
@@ -25,8 +39,18 @@ other.asp <- c("alternative","transparent")
 bank_overall.asp <- c("bank","atom")
 app.asp <- c("app","function","notification","notify","issue")
 
+
+
+# ============================================================================================================================
+#-----------------------------------  STEP 3: SUBSETTING THE ORIGINAL DATA BY ASPECT ----------------------------------------
+# ============================================================================================================================
+
+#Given a dataframe (Eg: "atom" from Step 1) and a vector of aspect (Eg: "account.asp" or "ui.asp"), this function returns a subset of the original dataframe
+# where the users have mentioned that particular aspect in their reviews
 get_aspect_df <- function(bank,aspect_syn){
+  #Filtering the dataframe for the cases only when the aspect exists
   bank <- bank[grepl(paste(aspect_syn,collapse = "|"),bank$content),]
+  #From the reviews, extracting only the sentences where people have talked about the given feature/aspect
   for(i in c(1:nrow(bank))){
     print(i)
     cur_rev <- str_split(bank$content[i],pattern = "\\.")%>%unlist()
@@ -37,12 +61,24 @@ get_aspect_df <- function(bank,aspect_syn){
   return(bank)
 }
 
+
+#Getting data by aspect
 acct <- get_aspect_df(atom,account.asp)
 ui <- get_aspect_df(atom,ui.asp)
 fees <- get_aspect_df(atom,fees.asp)
 cust_service <- get_aspect_df(atom,customer_service.asp)
 card <- get_aspect_df(atom,card.asp)
+#and so on
 
+
+
+
+
+# ============================================================================================================================
+#-----------------------------------  STEP 4: SENTIMENT ANALYSIS BY ASPECT ---------------------------------------------------
+# ============================================================================================================================
+
+#Given a aspect dataframe (Eg: "acct" or "ui" from Step 3, this function returns a overall sentiment score (between -5 and 5) for each review)
 get_sentiment <- function(df){
   sent <- syuzhet::get_sentiment(df$content)
   range <- max(sent)-min(sent)
@@ -50,16 +86,67 @@ get_sentiment <- function(df){
   return(sentiment)
 }
 
+#Adding the sentiment column to each aspect dataframe
 acct$sentiment <- get_sentiment(acct)
 ui$sentiment <- get_sentiment(ui)
 fees$sentiment <- get_sentiment(fees)
 cust_service$sentiment <- get_sentiment(cust_service)
 card$sentiment <- get_sentiment(card)
 
-mean(acct$sentiment)
-mean(ui$sentiment)
 
-write.csv(acct, )
+
+
+
+# ============================================================================================================================
+#---------------------  STEP 5: FINDING POSITIVE AND NEGATIVE ADJECTIVES TO DESCRIBE AN ASPECT---------------------------------
+# ============================================================================================================================
+
+#For this part, we'll be using a library called "udpipe". It helps us parse sentences as a human would do. 
+
+#To begin you need to download the udpipe model for english language 
+model    <- udpipe_download_model(language = "english-ewt")
+if(!model$download_failed){
+  ud_eng <- udpipe_load_model(model)}
+
+
+#Next, creating a udpipe object (might take a couple of minutes to run).
+#Also, calling the object as acct.ud to indicate that it is made out of the account dataframe and is a udpipe object
+acct.ud <- udpipe::udpipe(acct$content,ud_eng, doc_id = acct$id)%>%as.data.frame()
+ui.ud <- udpipe::udpipe(ui$content,ud_eng, doc_id = ui$id)%>%as.data.frame()
+fees.ud <- udpipe::udpipe(fees$content,ud_eng, doc_id = fees$id)%>%as.data.frame() 
+card.ud <- udpipe::udpipe(card$content,ud_eng, doc_id = card$id)%>%as.data.frame()
+
+
+#Given a udpipe object, this function returns top 5 positive and negative keywords people used to describe that feature
+get_keywords <- function(udpipe.obj){
+  stats <- keywords_rake(x = udpipe.obj, term = "token", group = "doc_id", ngram_max = 4,relevant = udpipe.obj$upos %in% c("NOUN", "ADJ"))%>%data.frame()
+  j <- stats[stats$ngram==3,]
+  j$sentiment <- syuzhet::get_sentiment(j$keyword)
+  j.pos <- j[j$sentiment>0,]%>%arrange(.,desc(sentiment))
+  j.neg <- j[j$sentiment<0,]%>%dplyr::arrange(.,sentiment)
+  
+  pos <- j.pos$keyword
+  neg <- j.neg$keyword
+  if(length(pos)<5){pos <- c(pos,rep(NA,(5-length(pos))))}
+  else{pos <- pos[1:5]}
+  if(length(neg)<5){neg <- c(neg,rep(NA,(5-length(neg))))}
+  else{neg<-neg[1:5]}
+  
+  df <- data.frame(pos_words=pos,neg_words=neg)
+  return(df)
+}
+
+
+#Finding positive and negative keywords
+acct.keywords <- get_keywords(acct.ud)
+ui.keywords <- get_keywords(ui.ud)
+fees.keywords <- get_keywords(fees.ud)
+card.keywords <- get_keywords(card.ud)
+
+#Exporting csv files
+write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.names=F)
+
+
 #Grouping by aspects
 # #Return a dataframe of aspect
 # 
@@ -76,9 +163,9 @@ write.csv(acct, )
 #   return(df)
 # }
 # 
-# acct <- get_aspect_df(monzo,"account",account)
-# ui <- get_aspect_df(monzo,"ui",ui)
-# fees <- get_aspect_df(monzo,"fees",fees)
+# acct <- get_aspect_df(atom,"account",account)
+# ui <- get_aspect_df(atom,"ui",ui)
+# fees <- get_aspect_df(atom,"fees",fees)
 # 
 # 
 # 
@@ -95,13 +182,13 @@ write.csv(acct, )
 # 
 # 
 # 
-# monzo.ud.sub <- cbind(monzo.ud.sub,aspects)
+# atom.ud.sub <- cbind(atom.ud.sub,aspects)
 # 
-# j <- monzo.ud.sub[monzo.ud.sub$dep_rel=="obl",]
+# j <- atom.ud.sub[atom.ud.sub$dep_rel=="obl",]
 # k <- table(j$lemma)%>%data.frame()%>%dplyr::arrange(.,desc(Freq))
 # 
 # 
-# stats <- keywords_collocation(x = monzo.ud.sub, 
+# stats <- keywords_collocation(x = atom.ud.sub, 
 #                      term = "token", group = c("doc_id","sentence_id"),
 #                      ngram_max = 4)%>%data.frame()%>%dplyr::arrange(.,desc(freq))
 # 
@@ -109,7 +196,7 @@ write.csv(acct, )
 # 
 # #grouping similar topics
 # 
-# s <- get_sentences(monzo.rev)
+# s <- get_sentences(atom.rev)
 # 
 # sent <- sentiment(s)
 # 
