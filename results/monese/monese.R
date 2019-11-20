@@ -12,13 +12,13 @@ library(stringr)
 # ============================================================================================================================
 #-----------------------------------------  STEP 1: READING DATA AND PREROCESSING --------------------------------------------
 # ============================================================================================================================
-atom <- read.csv("~/Downloads/19Fall/FinTech/NeoBanks/data/atom.csv", header = TRUE, stringsAsFactors = F)
+monese <- read.csv("~/Downloads/19Fall/FinTech/NeoBanks/data/monese.csv", header = TRUE, stringsAsFactors = F)
 
 #Creating an "id" variable
-atom$id <- c(1:nrow(atom))
+monese$id <- c(1:nrow(monese))
 
 #Cleaning for html tags, emoticons, emoji, extraneous white space, punctuation, numbers
-atom$content <- qdapRegex::rm_emoticon(atom$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
+monese$content <- qdapRegex::rm_emoticon(monese$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
 
 
 
@@ -36,7 +36,7 @@ fast.asp <- c("quick","instant","fast","time")
 card.asp <- c("card","mastercard","limit")
 safety.asp <- c("biometric","recog","face","voice","safe","fraud","verification","verify")
 other.asp <- c("alternative","transparent")
-bank_overall.asp <- c("bank","atom")
+bank_overall.asp <- c("bank","monese")
 app.asp <- c("app","function","notification","notify","issue")
 
 
@@ -45,7 +45,7 @@ app.asp <- c("app","function","notification","notify","issue")
 #-----------------------------------  STEP 3: SUBSETTING THE ORIGINAL DATA BY ASPECT ----------------------------------------
 # ============================================================================================================================
 
-#Given a dataframe (Eg: "atom" from Step 1) and a vector of aspect (Eg: "account.asp" or "ui.asp"), this function returns a subset of the original dataframe
+#Given a dataframe (Eg: "monese" from Step 1) and a vector of aspect (Eg: "account.asp" or "ui.asp"), this function returns a subset of the original dataframe
 # where the users have mentioned that particular aspect in their reviews
 get_aspect_df <- function(bank,aspect_syn){
   #Filtering the dataframe for the cases only when the aspect exists
@@ -63,11 +63,11 @@ get_aspect_df <- function(bank,aspect_syn){
 
 
 #Getting data by aspect
-acct <- get_aspect_df(atom,account.asp)
-ui <- get_aspect_df(atom,ui.asp)
-fees <- get_aspect_df(atom,fees.asp)
-cust_service <- get_aspect_df(atom,customer_service.asp)
-card <- get_aspect_df(atom,card.asp)
+acct <- get_aspect_df(monese,account.asp)
+ui <- get_aspect_df(monese,ui.asp)
+fees <- get_aspect_df(monese,fees.asp)
+cust_service <- get_aspect_df(monese,customer_service.asp)
+card <- get_aspect_df(monese,card.asp)
 #and so on
 
 
@@ -149,7 +149,7 @@ fees.keywords
 card.keywords
 
 #Exporting csv files
-write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.names=F)
+write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/monese/acct.csv", row.names=F)
 
 
 #Grouping by aspects
@@ -168,9 +168,9 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 #   return(df)
 # }
 # 
-# acct <- get_aspect_df(atom,"account",account)
-# ui <- get_aspect_df(atom,"ui",ui)
-# fees <- get_aspect_df(atom,"fees",fees)
+# acct <- get_aspect_df(monese,"account",account)
+# ui <- get_aspect_df(monese,"ui",ui)
+# fees <- get_aspect_df(monese,"fees",fees)
 # 
 # 
 # 
@@ -187,13 +187,13 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # 
-# atom.ud.sub <- cbind(atom.ud.sub,aspects)
+# monese.ud.sub <- cbind(monese.ud.sub,aspects)
 # 
-# j <- atom.ud.sub[atom.ud.sub$dep_rel=="obl",]
+# j <- monese.ud.sub[monese.ud.sub$dep_rel=="obl",]
 # k <- table(j$lemma)%>%data.frame()%>%dplyr::arrange(.,desc(Freq))
 # 
 # 
-# stats <- keywords_collocation(x = atom.ud.sub, 
+# stats <- keywords_collocation(x = monese.ud.sub, 
 #                      term = "token", group = c("doc_id","sentence_id"),
 #                      ngram_max = 4)%>%data.frame()%>%dplyr::arrange(.,desc(freq))
 # 
@@ -201,7 +201,7 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # #grouping similar topics
 # 
-# s <- get_sentences(atom.rev)
+# s <- get_sentences(monese.rev)
 # 
 # sent <- sentiment(s)
 # 
@@ -225,7 +225,7 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # #Plotting
-# tiff("~/Desktop/nov11/atom_pos.tiff", units = "in", width=6, height=12, res=300)
+# tiff("~/Desktop/nov11/monese_pos.tiff", units = "in", width=6, height=12, res=300)
 # g <- ggplot2::ggplot()
 # g <- g + geom_col(mapping = aes(y=rake, x=reorder(keyword,rake)),col="black",fill="gold3",alpha=0.5,data = stats)
 # g <- g + coord_flip()
@@ -254,13 +254,13 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # monese$year <- year(date)
 # 
 # 
-# atom <- read.csv("~/Desktop/atom.csv",header = T, stringsAsFactors = F)
-# atom$id <- c(5000:(4999+nrow(atom)))
-# atom$rating <- as.numeric((str_extract(atom$stars,"[1-9]")))
-# date <- lubridate::dmy(atom$date)
-# atom$day <- day(date)
-# atom$month <- month(date)
-# atom$year <- year(date)
+# monese <- read.csv("~/Desktop/monese.csv",header = T, stringsAsFactors = F)
+# monese$id <- c(5000:(4999+nrow(monese)))
+# monese$rating <- as.numeric((str_extract(monese$stars,"[1-9]")))
+# date <- lubridate::dmy(monese$date)
+# monese$day <- day(date)
+# monese$month <- month(date)
+# monese$year <- year(date)
 # 
 # 
 # 
@@ -277,19 +277,19 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # 
-# #FOR ATOM
-# by_yr_mon <- dplyr::group_by(atom,year,month)
+# #FOR monese
+# by_yr_mon <- dplyr::group_by(monese,year,month)
 # sum_by_yr_mon <- dplyr::summarise(by_yr_mon,percent_5_star=(sum(rating==5)/n()))%>%data.frame()
 # sum_by_yr_mon$date <- (paste(sum_by_yr_mon$year,sum_by_yr_mon$month,"01",sep = "-"))
 # sum_by_yr_mon <- dplyr::select(sum_by_yr_mon,-year,-month)
 # sum_by_yr_mon$date <- lubridate::ymd(sum_by_yr_mon$date)
 # 
-# atom.rating.ts <- xts::xts(sum_by_yr_mon$percent_5_star, order.by = sum_by_yr_mon$date)
+# monese.rating.ts <- xts::xts(sum_by_yr_mon$percent_5_star, order.by = sum_by_yr_mon$date)
 # 
 # tiff("~/Desktop/nov11/ts.tiff", units = "in", width=12, height=6, res=300)
 # plot.xts(mon.rating.ts, col = "black", ylim=c(0,1), main="Percentage of monthly 5 star ratings")
-# lines(atom.rating.ts, col = "red",lwd=2)
-# addLegend(legend.loc = 'top', legend.names = c("Monese", "ATOM"),lty = 1, col = c("black","red"))
+# lines(monese.rating.ts, col = "red",lwd=2)
+# addLegend(legend.loc = 'top', legend.names = c("Monese", "monese"),lty = 1, col = c("black","red"))
 # dev.off()
 # 
 # 
@@ -301,15 +301,15 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # monese.pos <- monese[as.numeric(monese$rating)>=4,]
 # monese.posrev <- monese.pos$reviews
-# atom.pos <- atom[as.numeric(atom$rating)>=4,]
-# atom.posrev <- atom.pos$reviews
+# monese.pos <- monese[as.numeric(monese$rating)>=4,]
+# monese.posrev <- monese.pos$reviews
 # 
 # 
 # #Cleaning for html tags, emoticons, emoji, extraneous white space, punctuation, numbers
 # monese.posrev <- stri_replace_all(monese.posrev,"",regex = "<.*?>")%>% qdapRegex::rm_emoticon()%>%
 #   gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[:punct:]")%>%stri_replace_all(.,"",regex = "[0-9]")
 # 
-# atom.posrev <- stri_replace_all(atom.posrev,"",regex = "<.*?>")%>% qdapRegex::rm_emoticon()%>%
+# monese.posrev <- stri_replace_all(monese.posrev,"",regex = "<.*?>")%>% qdapRegex::rm_emoticon()%>%
 #   gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[:punct:]")%>%stri_replace_all(.,"",regex = "[0-9]")
 # 
 # 
@@ -320,7 +320,7 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # #Creating udpipe objects
 # mon.ud <- udpipe::udpipe(monese.posrev, ud_eng, doc_id = monese.pos$id)%>%as.data.frame()
-# atom.ud <- udpipe::udpipe(atom.posrev, ud_eng, doc_id = atom.pos$id)%>%as.data.frame()
+# monese.ud <- udpipe::udpipe(monese.posrev, ud_eng, doc_id = monese.pos$id)%>%as.data.frame()
 # 
 # 
 # # IDENTIFYING KEY PHRASES (with respect to features)
@@ -361,22 +361,22 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # dev.off()
 # 
 # 
-# #For Atom
+# #For monese
 # 
 # #Using RAKE
-# stats.atom <- keywords_rake(x = atom.ud, term = "lemma", group = "doc_id", 
-#                        relevant = atom.ud$upos %in% c("NOUN", "ADJ"))
-# stats.atom$key <- factor(stats.atom$keyword, levels = rev(stats$keyword))
-# stats.atom <-  head(subset(stats.atom, freq > 3), 20)
+# stats.monese <- keywords_rake(x = monese.ud, term = "lemma", group = "doc_id", 
+#                        relevant = monese.ud$upos %in% c("NOUN", "ADJ"))
+# stats.monese$key <- factor(stats.monese$keyword, levels = rev(stats$keyword))
+# stats.monese <-  head(subset(stats.monese, freq > 3), 20)
 # 
 # 
 # #Plotting
-# tiff("~/Desktop/nov11/atom_pos.tiff", units = "in", width=6, height=12, res=300)
+# tiff("~/Desktop/nov11/monese_pos.tiff", units = "in", width=6, height=12, res=300)
 # g <- ggplot2::ggplot()
-# g <- g + geom_col(mapping = aes(y=rake, x=reorder(keyword,rake)),col="black",fill="gold3",alpha=0.5,data = stats.atom)
+# g <- g + geom_col(mapping = aes(y=rake, x=reorder(keyword,rake)),col="black",fill="gold3",alpha=0.5,data = stats.monese)
 # g <- g + coord_flip()
 # g <- g + theme_minimal()
-# g <- g + ggtitle("ATOM: Positive Reviews")
+# g <- g + ggtitle("monese: Positive Reviews")
 # g <- g + theme(axis.text.y = element_text(size=14,colour="black",face="bold"),axis.title.y=element_blank(),
 #                axis.title.x =element_blank())
 # print(g)
@@ -395,11 +395,11 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # ## ================ STEP 1 #WHAT ARE PEOPLE WHO ARE GIVING NEGATIVE REVIEWS SAYING ==================
 # 
 # monese.neg <- monese[monese$rating<3,]
-# atom.neg <- atom[atom$reviews<3,]
+# monese.neg <- monese[monese$reviews<3,]
 # 
 # 
 # monese.negrev <- monese.neg$reviews
-# atom.negrev <- atom.neg$reviews
+# monese.negrev <- monese.neg$reviews
 # 
 # 
 # 
@@ -407,13 +407,13 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # monese.negrev <- stri_replace_all(monese.negrev,"",regex = "<.*?>")%>% qdapRegex::rm_emoticon()%>%
 #   gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[:punct:]")%>%stri_replace_all(.,"",regex = "[0-9]")
 # 
-# atom.negrev <- stri_replace_all(atom.negrev,"",regex = "<.*?>")%>% qdapRegex::rm_emoticon()%>%
+# monese.negrev <- stri_replace_all(monese.negrev,"",regex = "<.*?>")%>% qdapRegex::rm_emoticon()%>%
 #   gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[:punct:]")%>%stri_replace_all(.,"",regex = "[0-9]")
 # 
 # 
 # #Creating udpipe objects
 # mon.neg.ud <- udpipe::udpipe(monese.negrev, ud_eng, doc_id = monese.neg$id)%>%as.data.frame()
-# atom.neg.ud <- udpipe::udpipe(atom.negrev, ud_eng, doc_id = atom.neg$id)%>%as.data.frame()
+# monese.neg.ud <- udpipe::udpipe(monese.negrev, ud_eng, doc_id = monese.neg$id)%>%as.data.frame()
 # 
 # 
 # #For monese
@@ -434,27 +434,27 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # 
-# #For Atom
+# #For monese
 # 
 # #Using RAKE
-# stats.atom <- keywords_rake(x = atom.neg.ud, term = "lemma", group = "doc_id", 
-#                             relevant = atom.neg.ud$upos %in% c("NOUN", "ADJ"))
-# stats.atom$key <- factor(stats.atom$keyword, levels = rev(stats.atom$keyword))
-# stats.atom <- subset(stats.atom, freq > 2)
+# stats.monese <- keywords_rake(x = monese.neg.ud, term = "lemma", group = "doc_id", 
+#                             relevant = monese.neg.ud$upos %in% c("NOUN", "ADJ"))
+# stats.monese$key <- factor(stats.monese$keyword, levels = rev(stats.monese$keyword))
+# stats.monese <- subset(stats.monese, freq > 2)
 # 
-# stats.atom <- merge(atom.neg.ud, atom.neg.ud, 
+# stats.monese <- merge(monese.neg.ud, monese.neg.ud, 
 #                    by.x = c("doc_id", "paragraph_id", "sentence_id", "head_token_id"),
 #                    by.y = c("doc_id", "paragraph_id", "sentence_id", "token_id"),
 #                    all.x = TRUE, all.y = FALSE, 
 #                    suffixes = c("", "_parent"), sort = FALSE)
-# stats.atom <- subset(stats.atom, dep_rel %in% "nsubj" & upos %in% c("NOUN") & upos_parent %in% c("ADJ"))
-# stats.atom$term <- paste(stats.atom$lemma_parent, stats.atom$lemma, sep = " ")
-# stats.atom <- txt_freq(stats.atom$term)
-# stats.atom <- dplyr::select(stats.atom,-freq_pct)
+# stats.monese <- subset(stats.monese, dep_rel %in% "nsubj" & upos %in% c("NOUN") & upos_parent %in% c("ADJ"))
+# stats.monese$term <- paste(stats.monese$lemma_parent, stats.monese$lemma, sep = " ")
+# stats.monese <- txt_freq(stats.monese$term)
+# stats.monese <- dplyr::select(stats.monese,-freq_pct)
 # 
-# wc.atom.neg <- wordcloud2::wordcloud2(stats.atom,size=0.1,shape = "pentagon",ellipticity = 0.5)
-# htmlwidgets::saveWidget(wc.atom.neg,"tmp.html",selfcontained = F)
-# webshot::webshot("tmp.html","atomm_neg_rev.pdf",delay=5,vwidth = 500,vheight = 500)
+# wc.monese.neg <- wordcloud2::wordcloud2(stats.monese,size=0.1,shape = "pentagon",ellipticity = 0.5)
+# htmlwidgets::saveWidget(wc.monese.neg,"tmp.html",selfcontained = F)
+# webshot::webshot("tmp.html","monesem_neg_rev.pdf",delay=5,vwidth = 500,vheight = 500)
 # 
 # 
 # 
@@ -475,16 +475,16 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 #                               ngram_max = 4)
 # 
 # ## Co-occurrences: How frequent do words occur in the same sentence, in this case only nouns or adjectives
-# stats <- cooccurrence(x = subset(atom.neg.ud, upos %in% c("NOUN", "ADJ")), 
+# stats <- cooccurrence(x = subset(monese.neg.ud, upos %in% c("NOUN", "ADJ")), 
 #                       term = "lemma", group = c("doc_id", "paragraph_id", "sentence_id"))
 # 
 # ## Co-occurrences: How frequent do words follow one another
-# stats <- cooccurrence(x = atom.neg.ud$lemma, 
-#                       relevant = atom.neg.ud$upos %in% c("NOUN", "ADJ"))
+# stats <- cooccurrence(x = monese.neg.ud$lemma, 
+#                       relevant = monese.neg.ud$upos %in% c("NOUN", "ADJ"))
 # 
 # ## Co-occurrences: How frequent do words follow one another even if we would skip 2 words in between
-# stats <- cooccurrence(x = atom.neg.ud$lemma, 
-#                       relevant = atom.neg.ud$upos %in% c("NOUN", "ADJ"), skipgram = 3)
+# stats <- cooccurrence(x = monese.neg.ud$lemma, 
+#                       relevant = monese.neg.ud$upos %in% c("NOUN", "ADJ"), skipgram = 3)
 # head(stats)
 # 
 # 
@@ -509,8 +509,8 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # ## Build document term matrix on nouns/adjectives 
-# atom.neg.ud$topic_level_id <- unique_identifier(atom.neg.ud, fields = c("doc_id", "sentence_id"))
-# dtf <- subset(atom.neg.ud, upos %in% c("NOUN", "ADJ"))
+# monese.neg.ud$topic_level_id <- unique_identifier(monese.neg.ud, fields = c("doc_id", "sentence_id"))
+# dtf <- subset(monese.neg.ud, upos %in% c("NOUN", "ADJ"))
 # dtf <- document_term_frequencies(dtf, document = "topic_level_id", term = "lemma")
 # dtm <- document_term_matrix(x = dtf)
 # dtm_clean <- dtm_remove_lowfreq(dtm, minfreq = 5)
@@ -521,7 +521,7 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # topicterminology <- predict(m, type = "terms", min_posterior = 0.025, min_terms = 5)
 # 
 # scores <- predict(m, newdata = dtm, type = "topics")
-# x_topics <- merge(atom.neg.ud, scores, by.x="topic_level_id", by.y="doc_id")
+# x_topics <- merge(monese.neg.ud, scores, by.x="topic_level_id", by.y="doc_id")
 # 
 # topicterminology <- predict(m, type = "terms", min_posterior = 0.05, min_terms = 10)
 # termcorrs <- subset(x_topics, topic %in% c(1:n_k) & lemma %in% topicterminology[[1]]$term)
@@ -538,12 +538,12 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # 
-# atom.neg.ud$topic_level_id <- unique_identifier(atom.neg.ud, fields = c("doc_id", "sentence_id"))
+# monese.neg.ud$topic_level_id <- unique_identifier(monese.neg.ud, fields = c("doc_id", "sentence_id"))
 # 
 # 
 # 
-# #dtf <- subset(atom.neg.ud, upos %in% c("NOUN", "ADJ"))
-# dtf <- document_term_frequencies(stats.atom, term = "keyword")
+# #dtf <- subset(monese.neg.ud, upos %in% c("NOUN", "ADJ"))
+# dtf <- document_term_frequencies(stats.monese, term = "keyword")
 # dtm <- document_term_matrix(x = dtf)
 # dtm_clean <- dtm_remove_lowfreq(dtm, minfreq = 5)
 # 
@@ -554,12 +554,12 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # topicterminology <- predict(m, type = "terms", min_posterior = 0.025, min_terms = 5)
 # 
 # 
-# #x_topics <- merge(stats.atom, scores, by.x="topic_level_id", by.y="doc_id")
+# #x_topics <- merge(stats.monese, scores, by.x="topic_level_id", by.y="doc_id")
 # scores <- predict(m, dtm, type = "topics")
-# stats.atom <- dplyr::rename(stats.atom,topic=topic_level_id)
-# x_topics <- merge(stats.atom, scores, by.x="topic", by.y="doc_id")
+# stats.monese <- dplyr::rename(stats.monese,topic=topic_level_id)
+# x_topics <- merge(stats.monese, scores, by.x="topic", by.y="doc_id")
 # 
-# termcorrs <- subset(stats.atom, keyword %in% topicterminology[[1]]$term)
+# termcorrs <- subset(stats.monese, keyword %in% topicterminology[[1]]$term)
 # termcorrs <- document_term_frequencies(termcorrs, term = "keyword")
 # termcorrs <- document_term_matrix(termcorrs)
 # termcorrs <- dtm_cor(termcorrs)
@@ -676,8 +676,8 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # ## Using RAKE
-# stats <- keywords_rake(x = atom.ud, term = "lemma", group = "doc_id", 
-#                        relevant = atom.ud$upos %in% c("NOUN", "ADJ"))
+# stats <- keywords_rake(x = monese.ud, term = "lemma", group = "doc_id", 
+#                        relevant = monese.ud$upos %in% c("NOUN", "ADJ"))
 # stats$key <- factor(stats$keyword, levels = rev(stats$keyword))
 # barchart(key ~ rake, data = head(subset(stats, freq > 3), 20), col = "red", 
 #          main = "Keywords identified by RAKE", 
@@ -753,19 +753,19 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # #Tokenizing, stemming and crating document term matrix
 # dtm.mon <- quanteda::dfm(rev.mon,tolower=TRUE,stem=TRUE,remove=stopwords("english"))
-# dtm.atom <- quanteda::dfm(rev.atom,tolower=TRUE,stem=TRUE,remove=stopwords("english"))
+# dtm.monese <- quanteda::dfm(rev.monese,tolower=TRUE,stem=TRUE,remove=stopwords("english"))
 # 
 # #Creating frequencies of words
 # freq.mon <- docfreq(dtm.mon)
-# freq.atom <- docfreq(dtm.atom)
+# freq.monese <- docfreq(dtm.monese)
 # 
 # #Only keeping words with freq > 1
 # dtm.mon <- dtm.mon[,freq.mon>1]
-# dtm.atom <- dtm.atom[,freq.atom>1]
+# dtm.monese <- dtm.monese[,freq.monese>1]
 # 
 # #Converting the frequencies to propertions
 # dtm.mon <- dfm_tfidf(dtm.mon,scheme_tf="prop")
-# dtm.atom <- dfm_tfidf(dtm.atom,scheme_tf="prop")
+# dtm.monese <- dfm_tfidf(dtm.monese,scheme_tf="prop")
 # 
 # 
 # 
@@ -788,12 +788,12 @@ write.csv(acct,"~/Downloads/19Fall/FinTech/NeoBanks/results/atom/acct.csv", row.
 # 
 # 
 # # toks.mon <- quanteda::tokens(rev.mon)%>%quanteda::tokens_tolower()%>%quanteda::tokens_wordstem()
-# # toks.atom <- quanteda::tokens(rev.atom)%>%quanteda::tokens_tolower()%>%quanteda::tokens_wordstem()
+# # toks.monese <- quanteda::tokens(rev.monese)%>%quanteda::tokens_tolower()%>%quanteda::tokens_wordstem()
 # # #Dictionary of stop words
 # # stop_words <- quanteda::stopwords("english")
 # # #Removing stop words
 # # toks.mon <- quanteda::tokens_remove(toks.mon,stop_words)
-# # toks.atom <- quanteda::tokens_remove(toks.atom,stop_words)
+# # toks.monese <- quanteda::tokens_remove(toks.monese,stop_words)
 # # 
 # 
 # 
