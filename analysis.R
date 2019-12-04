@@ -8,7 +8,13 @@ library(tidytext)
 library(textdata)
 library(dplyr)
 library(stringr)
-
+library(ggplot2)
+library(HSAUR)
+library(xts)
+library(wordcloud2)
+library(textcat)
+library(cluster)
+library(dplyr)
 #install.packages(c("textclean","stringi","qdapRegex"...))
 
 
@@ -16,14 +22,120 @@ library(stringr)
 #-----------------------------------------  STEP 1: READING DATA AND PREROCESSING --------------------------------------------
 # ============================================================================================================================
 monzo <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/monzo.csv", header = TRUE, stringsAsFactors = F)
+revolut <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/revolut.csv", header = TRUE, stringsAsFactors = F)
+monese <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/monese.csv", header = TRUE, stringsAsFactors = F)
+atom <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/atom.csv", header = TRUE, stringsAsFactors = F)
+starling <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/starling.csv", header = TRUE, stringsAsFactors = F)
+n26 <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/data/n26.csv", header = TRUE, stringsAsFactors = F)
+
+#Finding what language the review is in 
+monzo$language <- textcat(monzo$content)
+revolut$language <- textcat(revolut$content)
+monese$language <- textcat(monese$content)
+atom$language <- textcat(atom$content)
+starling$language <- textcat(starling$content)
+n26$language <- textcat(n26$content)
+
+#Keeping only the reviews that are in English
+monzo <- monzo[monzo$language=="english",]
+revolut <- revolut[revolut$language=="english",]
+monese <- monese[monese$language=="english",]
+atom <- atom[atom$language=="english",]
+starling <- starling[starling$language=="english",]
+n26 <- n26[n26$language=="english",] 
+#Selecting a comparable sample for revolut
+set.seed(123)
+revolut <- revolut[sample(1:nrow(revolut),size=5000),]
 
 #Creating an "id" variable
 monzo$id <- c(1:nrow(monzo))
+revolut$id <- c(1:nrow(revolut))
+monese$id <- c(1:nrow(monese))
+atom$id <- c(1:nrow(atom))
+starling$id <- c(1:nrow(starling))
+n26$id <- c(1:nrow(n26))
 
-#Cleaning for html tags, emoticons, emoji, extraneous white space, punctuation, numbers
-monzo$content <- qdapRegex::rm_emoticon(monzo$content)%>%gsub("[^\x01-\x7F]", "",.)%>%stri_trim()%>%stri_trans_tolower()%>%stri_replace_all(.,"",regex = "[0-9]")
 
 
+
+#### COLLECTING ALL THE NOUNS FROM ALL THE DATASETS
+model    <- udpipe_download_model(language = "english-ewt")
+if(!model$download_failed){
+  ud_eng <- udpipe_load_model(model)}
+
+#Udpipe objects
+monzo.ud <- udpipe::udpipe(monzo$content,ud_eng,doc_id=monzo$id)%>%data.frame()
+monese.ud <- udpipe::udpipe(monese$content,ud_eng,doc_id=monese$id)%>%data.frame()
+atom.ud <- udpipe::udpipe(atom$content,ud_eng,doc_id=atom$id)%>%data.frame()
+starling.ud <- udpipe::udpipe(starling$content,ud_eng,doc_id=starling$id)%>%data.frame()
+n26.ud <- udpipe::udpipe(n26$content,ud_eng,doc_id=n26$id)%>%data.frame()
+revolut.ud <- udpipe::udpipe(revolut$content,ud_eng,doc_id=revolut$id)%>%data.frame()
+
+
+collect_nouns <- function(...){
+  list <- list(...)
+  all_nouns <- rep(list(NA),length(list))
+  for(i in c(1:length(list))){
+    print(i)
+    cur_df <- list[[i]]
+    nouns <- cur_df[cur_df$upos=="NOUN",]
+    all_nouns[[i]] <- nouns$lemma
+  }
+}
+
+all_nouns <- collect_nouns(monzo.ud,revolut.ud,atom.ud,monese.ud,starling.ud,n26.ud)
+
+monzo.ud <- udpipe::udpipe(monzo$content,ud_eng,doc_id=monzo$id)%>%data.frame()
+mon.ud.sub <- monzo.ud[monzo.ud$upos=="ADJ"|monzo.ud$upos=="NOUN"|monzo.ud$upos=="VERB",]
+
+mon.col <- udpipe::keywords_collocation(mon.ud.sub,term="lemma",group=c("doc_id","sentence_id"),ngram_max = 2,n_min = 3,sep=" ")%>%dplyr::arrange(.,desc(freq))
+mon.col$leftupos <- udpipe::udpipe(mon.col$left,ud_eng)$upos
+mon.col$rightupos <- udpipe::udpipe(mon.col$right,ud_eng)$upos
+#Removing (adj,adj), (adj,verb), (verb,verb), (verb,adj)
+filt <- (mon.col$leftupos=="ADJ"&mon.col$rightupos=="NOUN"|mon.col$leftupos=="NOUN"&mon.col$rightupos=="NOUN"|mon.col$leftupos=="VERB"&mon.col$rightupos=="NOUN")
+mon.col <- mon.col[filt,]
+dist_matrix <- stringdist::stringdistmatrix(tolower(mon.col$keyword),tolower(mon.col$keyword),useNames = T,method="cosine")%>%data.frame()
+
+dist = as.dist(dist_matrix)
+hc <- hclust(dist, method = "complete")
+k <- 20
+rect.hclust(hc, k=k)
+clusters <- cutree(hc, k=k)
+split(tolower(mon.col$keyword), clusters)
+
+clusplot(pam(dist, 6), color=TRUE, shade=F, labels=2, lines=0)
+hc <- hclust(dist)
+
+####
+
+km <- kmeans(dist,centers = 3)
+df <- data.frame(keyword=names(km$cluster),cluster=km$cluster)
+
+pamclu=cluster::pam(dist,k=2)
+plot(silhouette(pamclu),main=NULL)
+
+Ks=sapply(2:9,
+          function(i) 
+            summary(silhouette(pam(dist,k=i)))$avg.width)
+plot(2:9,Ks,xlab="k",ylab="av. silhouette",type="b",
+     pch=19)
+
+
+j <- df[df$cluster==1,]
+
+
+clust <- c(1:30)
+cost <- rep(NA,length(clust))
+
+#run kmeans for all clusters up to 100
+for(i in 1:30){
+  print(i)
+  #Run kmeans for each level of i, allowing up to 100 iterations for convergence
+  kmeans<- kmeans(x=dist, centers=i, iter.max=100)
+  clust[i] <- i
+  cost[i] <- kmeans$tot.withinss
+}
+cost_df <- data.frame(cluster=clust,cost=cost)
 
 # ============================================================================================================================
 #-----------------------------------------  STEP 2: CREATING LIST OF ASPECTS -------------------------------------------------
@@ -32,15 +144,20 @@ monzo$content <- qdapRegex::rm_emoticon(monzo$content)%>%gsub("[^\x01-\x7F]", ""
 #For now, we are looking at ten aspects, namely account, ui, fees, app, customer service, fast, card, safety, other, bank_overall
 
 account.asp <- c("account","spend","current","debit","money","credit","overdraft","withdrawal","business","pot","finance","invest","saving","limit","wallet","interest","budget","cheque")
-ui.asp <- c("login","payments","person","efficient","inefficient","easy","problem","difficult","transparent","ui","user","interface","experience")
+ui.asp <- c("app","function","notification","notify","issue","login","payments","person","efficient","inefficient","easy","problem","difficult","transparent","ui","user","interface","experience")
 fees.asp <- c("transfer","salary","fee","payment","cash","international","foreign","currency","travel","pay","send","value","free","interest","bill")
-customer_service.asp <- c("customer service","customer support","experience","complain","hassle","issue")
-fast.asp <- c("quick","instant","fast","time")
+customer_service.asp <- c("quick","instant","fast","time","customer service","customer support","experience","complain","hassle","issue")
 card.asp <- c("card","mastercard","limit")
-safety.asp <- c("biometric","recog","face","voice","safe","fraud","verification","verify")
-other.asp <- c("alternative","transparent")
-bank_overall.asp <- c("bank","monzo")
-app.asp <- c("app","function","notification","notify","issue")
+
+aspects <- list(account.asp,ui.asp,fees.asp,customer_service.asp,card.asp)
+names(aspects) <- c("account","ui","fees","customer_service","card")
+
+#fast.asp <- c()
+#app.asp <- c()
+#safety.asp <- c("biometric","recog","face","voice","safe","fraud","verification","verify")
+#other.asp <- c("alternative","transparent")
+#bank_overall.asp <- c("bank","monzo")
+
 
 
 
@@ -66,14 +183,21 @@ get_aspect_df <- function(bank,aspect_syn){
 
 
 #Getting data by aspect
-acct <- get_aspect_df(monzo,account.asp)
-ui <- get_aspect_df(monzo,ui.asp)
-fees <- get_aspect_df(monzo,fees.asp)
-cust_service <- get_aspect_df(monzo,customer_service.asp)
-card <- get_aspect_df(monzo,card.asp)
+#acct <- get_aspect_df(monzo,account.asp)
+#ui <- get_aspect_df(monzo,ui.asp)
+#fees <- get_aspect_df(monzo,fees.asp)
+#cust_service <- get_aspect_df(monzo,customer_service.asp)
+#card <- get_aspect_df(monzo,card.asp)
 #and so on
 
 
+#Given a aspect dataframe (Eg: "acct" or "ui" from Step 3, this function returns a overall sentiment score (between -5 and 5) for each review)
+get_sentiment <- function(df){
+  sent <- syuzhet::get_sentiment(df$content)
+  range <- max(sent)-min(sent)
+  sentiment <- (((sent-min(sent))*4)/range)+(-2)
+  return(sentiment)
+}
 
 
 
@@ -81,13 +205,216 @@ card <- get_aspect_df(monzo,card.asp)
 #-----------------------------------  STEP 4: SENTIMENT ANALYSIS BY ASPECT ---------------------------------------------------
 # ============================================================================================================================
 
-#Given a aspect dataframe (Eg: "acct" or "ui" from Step 3, this function returns a overall sentiment score (between -5 and 5) for each review)
-get_sentiment <- function(df){
-  sent <- syuzhet::get_sentiment(df$content)
-  range <- max(sent)-min(sent)
-  sentiment <- (((sent-min(sent))*10)/range)+(-5)
-  return(sentiment)
+find_sentiment <- function(df,aspects){
+  list <- rep(list(NA),length(aspects))
+  names(list) <- names(aspects)
+  
+  for(i in c(1:length(aspects))){
+    asp.df <- get_aspect_df(df,aspects[[i]])
+    list[[i]] <- get_sentiment(asp.df)
+  }
+  return(list)
 }
+
+
+monzo.sent <- find_sentiment(monzo,aspects)
+revolut.sent <- find_sentiment(revolut,aspects)
+monese.sent <- find_sentiment(monese,aspects)
+atom.sent <- find_sentiment(atom,aspects)
+starling.sent <- find_sentiment(starling,aspects)
+n26.sent <- find_sentiment(n26,aspects)
+
+bank.sent <- list(monzo.sent,revolut.sent,monese.sent,atom.sent,starling.sent,n26.sent)
+names(bank.sent) <- c("monzo","revolut","monese","atom","starling","n26")
+####### data by feature
+
+get_feature_sentiment <- function(bank_list,aspect){
+  bank <- c()
+  feature <- c()
+  sentiment <- c()
+  
+  for(i in c(1:length(bank_list))){
+    cur_sent <- bank_list[[i]][[aspect]]
+    bank <- append(bank,values = rep(names(bank_list)[i],length(cur_sent)),after = length(bank))
+    feature <- append(feature,values=rep(aspect,length(cur_sent)),after = length(feature))
+    sentiment <- append(sentiment,values=cur_sent,after = length(sentiment))
+  }
+  return(data.frame(bank,feature,sentiment))
+  
+}
+
+
+
+account <- get_feature_sentiment(bank.sent,"account")
+ui <- get_feature_sentiment(bank.sent,"ui")
+fees <- get_feature_sentiment(bank.sent,"fees")
+customer_service <- get_feature_sentiment(bank.sent,"customer_service")
+card <- get_feature_sentiment(bank.sent,"card")
+
+
+
+
+##########################################################
+
+
+get_feature_sent_plot <- function(df, feature){
+  by_bank <- group_by(df,bank)
+  sum_by_bank <- summarise(by_bank,median=median(sentiment))
+  g <- ggplot()
+  g <- g + geom_violin(mapping = aes(x=bank,y=sentiment, fill=bank),data=df)
+  g <- g + geom_point(mapping = aes(x=bank,y=median),pch=18,size=3,col="black",data=sum_by_bank)
+  g <- g + theme_minimal()
+  g <- g + ggtitle(paste(feature,"sentiment",sep=" "))
+  g <- g + theme(axis.text=element_text(size=13),axis.title=element_text(size=12,face="bold"))
+  print(g)
+  return(NULL)
+}
+
+
+get_feature_sent_plot(account,"Account")
+get_feature_sent_plot(ui,"UI")
+get_feature_sent_plot(fees,"Fees")
+get_feature_sent_plot(customer_service,"Customer Service")
+get_feature_sent_plot(card,"Card")
+
+
+
+####
+anova.acc <- aov(sentiment~bank,data = account)
+anova.ui <- aov(sentiment~bank,data = ui)
+anova.fees <- aov(sentiment~bank,data = fees)
+anova.cs <- aov(sentiment~bank,data = customer_service)
+anova.card <- aov(sentiment~bank,data = card)
+
+comparison.acc <-TukeyHSD(anova.acc,'bank')$bank 
+comparison.ui <-TukeyHSD(anova.ui,'bank')$bank 
+comparison.fees <-TukeyHSD(anova.fees,'bank')$bank 
+comparison.cs <-TukeyHSD(anova.cs,'bank')$bank 
+comparison.card <-TukeyHSD(anova.card,'bank')$bank
+
+write.csv(comparison.acc,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/anova/acc.csv",row.names = T)
+write.csv(comparison.ui,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/anova/ui.csv",row.names = T)
+write.csv(comparison.fees,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/anova/fees.csv",row.names = T)
+write.csv(comparison.cs,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/anova/cs.csv",row.names = T)
+write.csv(comparison.card,"/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/anova/card.csv",row.names = T)
+
+
+
+
+
+
+
+#######################
+get_feature_performance <- function(feature_df,feature){
+  grouped <- dplyr::group_by(feature_df,bank)
+  sum <- dplyr::summarise(grouped,mdn_sentiment=median(sentiment),count=n())
+  total <- (abs(sum$mdn_sentiment)*sum$count)%>%sum()
+  sum <- dplyr::mutate(sum,fps=((mdn_sentiment*count)/total))
+  df <- data.frame(bank=sum$bank,feature=rep(feature,6),fps=sum$fps)
+  return(df)
+}
+
+acct.fps <- get_feature_performance(account,"account")
+ui.fps <- get_feature_performance(ui,"ui")
+fees.fps <- get_feature_performance(fees,"fees")
+cs.fps <- get_feature_performance(customer_service,"customer_service")
+card.fps <- get_feature_performance(card,"card")
+
+combined.fps <- rbind(acct.fps,ui.fps,fees.fps,cs.fps,card.fps)
+
+
+
+g <- ggplot()
+g <-  g + geom_point(mapping = aes(x=bank,y=fps,col=feature),size=4,data=combined.fps)
+g <- g + ggtitle("Feature Performance Score by Bank")
+g <- g + theme_minimal()
+g <- g + theme(axis.text=element_text(size=13),axis.title=element_text(size=12,face="bold"))
+print(g)
+
+
+
+
+
+
+
+
+
+
+###############   CASE FOR REVOLUT  ###############
+
+ts <- read.csv("/Users/showrooppokhrel/Documents/GitHub/NeoBanks/results/plots/monzo_revolut.csv",header = F,stringsAsFactors = F)
+names(ts) <- ts[2,]
+ts <- ts[c(-1,-2),]
+
+rev <- xts::xts(as.numeric(ts$`Revolut: (United Kingdom)`), order.by = as.Date(ts$Week))
+monzo <- xts::xts(as.numeric(ts$`Monzo: (United Kingdom)`),order.by = as.Date(ts$Week))
+
+plot.xts(rev,lty=2,ylim=c(0,100))
+lines(monzo,col = "red",lwd=1.5)
+addLegend(legend.loc = 'top', legend.names = c("Revolut", "Monzo"),lty = c(2,1), col = c("black","red"))
+
+
+
+
+#To begin you need to download the udpipe model for english language 
+model    <- udpipe_download_model(language = "english-ewt")
+if(!model$download_failed){
+  ud_eng <- udpipe_load_model(model)}
+
+rev.ud <- udpipe::udpipe(revolut$content,ud_eng,doc_id=revolut$id)%>%data.frame()
+
+
+stats <- keywords_rake(x = rev.ud, term = "lemma", group = "doc_id", ngram_max = 3,relevant = rev.ud$upos %in% c("NOUN", "ADJ"))%>%data.frame()
+stats$sent <- syuzhet::get_sentiment(stats$keyword)
+j <- stats[stats$sent<0&stats$ngram==3,]
+j$intensity <- (j$freq*j$sent)
+j <- dplyr::arrange(j,intensity)
+df <- data.frame(word=j$keyword,freq=j$intensity)
+wordcloud2::wordcloud2(df,size=0.02,shape = "pentagon", ellipticity = 0.2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #Adding the sentiment column to each aspect dataframe
 acct$sentiment <- get_sentiment(acct)
